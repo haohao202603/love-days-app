@@ -210,6 +210,25 @@
   .tip-box { background: var(--pink-light); border-radius: 12px; padding: 11px 13px; font-size: 12.5px; color: #a06a76; line-height: 1.65; }
   .divider { height: 1px; background: #fdf0f2; margin: 12px 0; }
   .center { text-align: center; }
+  /* ---------- 日记 ---------- */
+  .chip { display: inline-block; background: var(--pink-light); color: var(--pink-deep); font-size: 12px; font-weight: 700; border-radius: 10px; padding: 3px 10px; }
+  .diary-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .diary-head .muted { flex: 1; text-align: right; }
+  .diary-text { font-size: 15px; line-height: 1.75; white-space: pre-wrap; word-break: break-word; margin-bottom: 10px; }
+  .photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .photo-grid .ph, .preview-grid .ph { position: relative; aspect-ratio: 1/1; border-radius: 10px; overflow: hidden; background: #fbe4e8; display: flex; align-items: center; justify-content: center; }
+  .photo-grid .ph { cursor: pointer; }
+  .photo-grid img, .preview-grid img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .ph-loading, .ph-missing { font-size: 20px; color: var(--muted); }
+  .preview-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
+  .ph-del { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border: none; border-radius: 50%; background: rgba(74, 59, 62, .75); color: #fff; font-size: 11px; line-height: 1; cursor: pointer; }
+  .diary-empty { text-align: center; padding: 26px 10px; color: var(--muted); font-size: 14px; line-height: 1.9; }
+  #lightbox { position: fixed; inset: 0; background: rgba(24, 12, 14, .95); z-index: 80; display: none; align-items: center; }
+  #lightbox.open { display: flex; }
+  #lightbox .lb-scroll { display: flex; overflow-x: auto; width: 100%; align-items: center; scroll-snap-type: x mandatory; }
+  #lightbox .lb-scroll img { max-width: 100%; max-height: 86vh; margin: 0 8px; scroll-snap-align: center; border-radius: 6px; }
+  #lightbox .lb-close { position: absolute; top: calc(10px + env(safe-area-inset-top)); right: 14px; color: #fff; font-size: 20px; width: 36px; height: 36px; border-radius: 50%; background: rgba(255, 255, 255, .15); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+
   input[type=file] { display: none; }
 </style>
 </head>
@@ -280,6 +299,29 @@
     </div>
   </section>
 
+  <!-- ================= 日记 ================= -->
+  <section class="tab-page" id="page-diary">
+    <div class="card">
+      <h3>✍️ 记录美好
+        <span style="flex:1"></span>
+        <button class="btn small ghost" onclick="app.toggleDiaryForm()">＋ 写日记</button>
+      </h3>
+      <div class="muted" id="diaryWho"></div>
+      <div class="form-panel" id="diaryForm">
+        <div class="divider"></div>
+        <div class="field"><label>日期</label><input type="date" id="diaryDate"></div>
+        <div class="field"><label>美好的文字</label><textarea id="diaryText" maxlength="2000" placeholder="今天发生了什么值得记住的事?"></textarea></div>
+        <div class="field"><label>照片(最多 9 张)</label>
+          <div class="preview-grid" id="photoPreview"></div>
+          <button class="btn small ghost" onclick="document.getElementById('diaryFiles').click()">📷 添加照片</button>
+          <input type="file" id="diaryFiles" accept="image/*" multiple onchange="app.pickPhotos(this)">
+        </div>
+        <button class="btn" onclick="app.saveDiary()">保存日记</button>
+      </div>
+    </div>
+    <div id="diaryList"></div>
+  </section>
+
   <!-- ================= 经期 ================= -->
   <section class="tab-page" id="page-period">
     <div id="periodBanner"></div>
@@ -327,6 +369,13 @@
         <div class="field" style="margin-bottom:0"><label>她的称呼</label><input type="text" id="nameB" maxlength="8" placeholder="如：老婆"></div>
       </div>
       <button class="btn small" style="margin-top:12px" onclick="app.saveNames()">保存称呼</button>
+      <div class="divider"></div>
+      <div class="field" style="margin-bottom:0"><label>这台手机是谁的?(决定日记署名;每台手机各选一次,不随同步改变)</label>
+        <div class="seg">
+          <button type="button" id="idA" onclick="app.setIdentity('a')">称呼A</button>
+          <button type="button" id="idB" onclick="app.setIdentity('b')">称呼B</button>
+        </div>
+      </div>
     </div>
 
     <div class="card">
@@ -391,8 +440,14 @@
   <button class="on" data-tab="home" onclick="app.go('home')"><span class="ico">❤️</span>首页</button>
   <button data-tab="ann" onclick="app.go('ann')"><span class="ico">🎉</span>纪念日</button>
   <button data-tab="period" onclick="app.go('period')"><span class="ico">🌸</span>经期</button>
+  <button data-tab="diary" onclick="app.go('diary')"><span class="ico">📖</span>日记</button>
   <button data-tab="sync" onclick="app.go('sync')"><span class="ico">🤝</span>同步</button>
 </nav>
+
+<div id="lightbox" onclick="app.closeLightbox()">
+  <div class="lb-scroll" id="lbScroll" onclick="event.stopPropagation()"></div>
+  <div class="lb-close" onclick="app.closeLightbox()">✕</div>
+</div>
 
 <div id="toast"></div>
 
@@ -574,6 +629,10 @@
   function renderSync() {
     $('nameA').value = state.names.a || '';
     $('nameB').value = state.names.b || '';
+    $('idA').textContent = state.names.a || '称呼A';
+    $('idB').textContent = state.names.b || '称呼B';
+    $('idA').classList.toggle('on', identity === 'a');
+    $('idB').classList.toggle('on', identity === 'b');
     renderCoupleLine();
     /* 安装引导 */
     const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
@@ -639,7 +698,96 @@
     syncTimer = setTimeout(function () { doCloudSync(true); }, 4000);
   }
 
-  function renderAll() { renderHome(); renderAnn(); renderPeriod(); renderSync(); renderCloud(); }
+  /* ---------- 日记 ---------- */
+  const IDENTITY_KEY = 'lovedays.identity.v1';
+  let identity = localStorage.getItem(IDENTITY_KEY) || '';
+  let pendingPhotos = [];
+  const photoURLs = {};
+
+  function authorName(by) { return (state.names && (state.names[by] || '')) || (by === 'a' ? '我' : '你'); }
+  function myLabel() { return identity ? authorName(identity) : ''; }
+
+  async function compressPhoto(file) {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise(function (res, rej) {
+        const i = new Image();
+        i.onload = function () { res(i); };
+        i.onerror = function () { rej(new Error('图片读取失败')); };
+        i.src = url;
+      });
+      const maxDim = 1280;
+      const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.max(1, Math.round(img.naturalWidth * scale));
+      const h = Math.max(1, Math.round(img.naturalHeight * scale));
+      const cv = document.createElement('canvas');
+      cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(img, 0, 0, w, h);
+      let blob = await new Promise(function (res) { cv.toBlob(res, 'image/jpeg', 0.72); });
+      if (!blob) throw new Error('图片编码失败');
+      if (blob.size > 280 * 1024) blob = await new Promise(function (res) { cv.toBlob(res, 'image/jpeg', 0.5); });
+      return { blob: blob, w: w, h: h };
+    } finally { URL.revokeObjectURL(url); }
+  }
+
+  function renderPhotoPreview() {
+    const box = $('photoPreview');
+    box.innerHTML = pendingPhotos.length
+      ? pendingPhotos.map(function (p) {
+          return '<div class="ph"><img src="' + p.url + '"><button class="ph-del" onclick="app.removePendingPhoto(\'' + p.id + '\')">✕</button></div>';
+        }).join('')
+      : '<div class="muted" style="font-size:12px">还没选照片,只写文字也可以</div>';
+  }
+
+  async function photoURL(id) {
+    if (photoURLs[id]) return photoURLs[id];
+    if (!window.LoveCloud.media) return null;
+    try {
+      const blob = await window.LoveCloud.media.get(id);
+      if (!blob) return null;
+      photoURLs[id] = URL.createObjectURL(blob);
+      return photoURLs[id];
+    } catch (e) { return null; }
+  }
+
+  async function hydratePhotos() {
+    const els = document.querySelectorAll('#diaryList .ph[data-ph]');
+    for (const el of els) {
+      const u = await photoURL(el.getAttribute('data-ph'));
+      if (u) el.innerHTML = '<img src="' + u + '">';
+      else el.innerHTML = '<div class="ph-missing" title="等待同步下载">📷</div>';
+    }
+  }
+
+  function renderDiary() {
+    const who = $('diaryWho');
+    who.innerHTML = identity
+      ? '这台手机署名:<b>' + esc(myLabel()) + '</b>'
+      : '⚠️ 先到「同步」页选好这台手机是谁的,日记才能署名';
+    const list = (state.diary || []).slice().sort(function (a, b) {
+      return (b.date + (b.createdAt || '')).localeCompare(a.date + (a.createdAt || ''));
+    });
+    const wrap = $('diaryList');
+    if (!list.length) {
+      wrap.innerHTML = '<div class="card"><div class="diary-empty">📖 还没有日记<br><span class="muted">记下你们的第一段美好时光吧</span></div></div>';
+      return;
+    }
+    wrap.innerHTML = list.map(function (d) {
+      const photos = (d.photos || []).map(function (p, i) {
+        return '<div class="ph" data-ph="' + p.id + '" onclick="app.showPhoto(\'' + d.id + '\',' + i + ')"><div class="ph-loading">…</div></div>';
+      }).join('');
+      return '<div class="card">' +
+        '<div class="diary-head"><span class="chip">' + esc(authorName(d.by)) + '</span>' +
+        '<span class="muted">' + esc(d.date) + '</span>' +
+        '<button class="del-btn" onclick="app.delDiary(\'' + d.id + '\')">✕</button></div>' +
+        (d.text ? '<div class="diary-text">' + esc(d.text) + '</div>' : '') +
+        (photos ? '<div class="photo-grid">' + photos + '</div>' : '') +
+        '</div>';
+    }).join('');
+    hydratePhotos();
+  }
+
+  function renderAll() { renderHome(); renderAnn(); renderPeriod(); renderSync(); renderCloud(); renderDiary(); }
 
   /* ---------- 对外动作 ---------- */
 
@@ -651,6 +799,7 @@
       if (tab === 'home') renderHome();
       if (tab === 'ann') renderAnn();
       if (tab === 'period') renderPeriod();
+      if (tab === 'diary') renderDiary();
       if (tab === 'sync') renderSync();
       window.scrollTo(0, 0);
     },
@@ -801,7 +950,99 @@
       cloudCfg = null;
       renderCloud();
       toast('已断开云端同步');
-    }
+    },
+
+    setIdentity(w) {
+      identity = w;
+      localStorage.setItem(IDENTITY_KEY, w);
+      renderSync(); renderDiary();
+      toast('这台手机署名:「' + myLabel() + '」');
+    },
+
+    toggleDiaryForm() {
+      const p = $('diaryForm');
+      p.classList.toggle('open');
+      if (p.classList.contains('open')) {
+        $('diaryDate').value = C.todayStr();
+        renderPhotoPreview();
+      }
+    },
+
+    async pickPhotos(input) {
+      const files = Array.from(input.files || []);
+      input.value = '';
+      if (!files.length) return;
+      if (!identity) { toast('先在「同步」页选好这台手机是谁的'); return app.go('sync'); }
+      if (!window.LoveCloud.media) { toast('当前环境不支持存储照片,请换正常浏览器'); return; }
+      for (const f of files) {
+        if (pendingPhotos.length >= 9) { toast('一次最多 9 张照片'); break; }
+        try {
+          const r = await compressPhoto(f);
+          pendingPhotos.push({ id: 'p' + Date.now() + Math.random().toString(36).slice(2, 6), blob: r.blob, w: r.w, h: r.h, url: URL.createObjectURL(r.blob) });
+        } catch (e) { toast('有图片不支持,已跳过'); }
+      }
+      renderPhotoPreview();
+    },
+
+    removePendingPhoto(id) {
+      const i = pendingPhotos.findIndex(function (p) { return p.id === id; });
+      if (i >= 0) { URL.revokeObjectURL(pendingPhotos[i].url); pendingPhotos.splice(i, 1); }
+      renderPhotoPreview();
+    },
+
+    async saveDiary() {
+      if (!identity) { toast('先在「同步」页选好这台手机是谁的'); return app.go('sync'); }
+      const text = $('diaryText').value.trim();
+      const date = $('diaryDate').value || C.todayStr();
+      if (!text && !pendingPhotos.length) return toast('写点什么或选张照片吧');
+      for (const p of pendingPhotos) {
+        try { await window.LoveCloud.media.put(p.id, p.blob); }
+        catch (e) { return toast('照片存储失败,请重试'); }
+      }
+      state.diary.unshift({
+        id: 'd' + Date.now() + Math.random().toString(36).slice(2, 6),
+        by: identity, date: date, text: text,
+        photos: pendingPhotos.map(function (p) { return { id: p.id, gistId: null, w: p.w, h: p.h }; }),
+        createdAt: Date.now(), updatedAt: Date.now()
+      });
+      pendingPhotos.forEach(function (p) { URL.revokeObjectURL(p.url); });
+      pendingPhotos = [];
+      $('diaryText').value = '';
+      app.toggleDiaryForm();
+      save(); renderAll(); toast('日记已保存 📖 已排入自动同步');
+    },
+
+    async delDiary(id) {
+      if (!confirm('删除这篇日记?(照片也会一并删除)')) return;
+      const e = state.diary.find(function (x) { return x.id === id; });
+      if (!e) return;
+      for (const ph of (e.photos || [])) {
+        if (ph.gistId) state.pendingPhotoDeletes.push(ph.gistId);
+        try { await window.LoveCloud.media.del(ph.id); } catch (err) {}
+        if (photoURLs[ph.id]) { URL.revokeObjectURL(photoURLs[ph.id]); delete photoURLs[ph.id]; }
+      }
+      e.deleted = true; e.updatedAt = Date.now();
+      save(); renderAll(); toast('已删除');
+    },
+
+    showPhoto(entryId, idx) {
+      const e = state.diary.find(function (x) { return x.id === entryId; });
+      if (!e) return;
+      const sc = $('lbScroll');
+      sc.innerHTML = (e.photos || []).map(function (p) { return '<img data-lb="' + p.id + '" alt="照片">'; }).join('');
+      $('lightbox').classList.add('open');
+      (e.photos || []).forEach(function (p, i) {
+        photoURL(p.id).then(function (u) {
+          const img = sc.querySelector('[data-lb="' + p.id + '"]');
+          if (!img) return;
+          if (u) img.src = u;
+          else img.outerHTML = '<div class="ph-missing">📷</div>';
+          if (i === idx && img.scrollIntoView) img.scrollIntoView({ inline: 'center' });
+        });
+      });
+    },
+
+    closeLightbox() { $('lightbox').classList.remove('open'); }
   };
 
   function fallbackCopy(text, done) {
