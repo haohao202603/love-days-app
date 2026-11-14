@@ -212,7 +212,9 @@
       names: { a: '', b: '' },
       togetherSince: '',
       anniversaries: [],  /* {id,name,date,repeat,updatedAt,deleted} */
-      periods: []         /* {start,end,updatedAt,deleted} */
+      periods: [],        /* {start,end,updatedAt,deleted} */
+      diary: [],          /* {id,by,date,text,photos:[{id,gistId,w,h}],createdAt,updatedAt,deleted} */
+      pendingPhotoDeletes: [] /* 待删除云端照片 gist id 列表 */
     };
   }
 
@@ -284,6 +286,21 @@
       if (!old || (p.updatedAt || 0) > (old.updatedAt || 0)) per[p.start] = p;
     }
     out.periods = Object.values(per).filter(p => !p.deleted).map(p => ({ start: p.start, end: p.end || '', updatedAt: p.updatedAt || 0 }));
+
+    /* 日记:按 id 合并(整条取新) */
+    const dia = {};
+    for (const d of (L.diary || [])) dia[d.id] = d;
+    for (const d of (R.diary || [])) {
+      const old = dia[d.id];
+      if (!old || (d.updatedAt || 0) > (old.updatedAt || 0)) dia[d.id] = d;
+    }
+    out.diary = Object.values(dia).filter(d => !d.deleted);
+
+    /* 待删照片列表:取并集 */
+    const pd = {};
+    for (const g of (L.pendingPhotoDeletes || [])) pd[g] = 1;
+    for (const g of (R.pendingPhotoDeletes || [])) pd[g] = 1;
+    out.pendingPhotoDeletes = Object.keys(pd);
 
     return out;
   }
