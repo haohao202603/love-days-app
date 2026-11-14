@@ -214,6 +214,7 @@
       anniversaries: [],  /* {id,name,date,repeat,updatedAt,deleted} */
       periods: [],        /* {start,end,updatedAt,deleted} */
       diary: [],          /* {id,by,date,text,photos:[{id,gistId,w,h}],createdAt,updatedAt,deleted} */
+      bgPhoto: null,      /* 首页背景 {id,gistId,updatedAt};id 为空串表示已恢复默认 */
       pendingPhotoDeletes: [] /* 待删除云端照片 gist id 列表 */
     };
   }
@@ -295,6 +296,11 @@
       if (!old || (d.updatedAt || 0) > (old.updatedAt || 0)) dia[d.id] = d;
     }
     out.diary = Object.values(dia).filter(d => !d.deleted);
+
+    /* 首页背景:整对象按更新时间取新(空串 id 是"已恢复默认"的墓碑) */
+    const lbT = (L.bgPhoto && L.bgPhoto.updatedAt) || 0;
+    const rbT = (R.bgPhoto && R.bgPhoto.updatedAt) || 0;
+    out.bgPhoto = rbT > lbT ? (R.bgPhoto || null) : (L.bgPhoto || null);
 
     /* 待删照片列表:取并集 */
     const pd = {};
