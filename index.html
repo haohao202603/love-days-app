@@ -229,6 +229,20 @@
   #lightbox .lb-scroll img { max-width: 100%; max-height: 86vh; margin: 0 8px; scroll-snap-align: center; border-radius: 6px; }
   #lightbox .lb-close { position: absolute; top: calc(10px + env(safe-area-inset-top)); right: 14px; color: #fff; font-size: 20px; width: 36px; height: 36px; border-radius: 50%; background: rgba(255, 255, 255, .15); display: flex; align-items: center; justify-content: center; cursor: pointer; }
 
+  .photo-pick { display: block; text-align: center; padding: 15px 10px; border: 1.5px dashed var(--pink); border-radius: 14px; color: var(--pink-deep); font-weight: 700; font-size: 14px; background: #fff; cursor: pointer; }
+  .photo-pick:active { background: var(--pink-light); }
+  .photo-strip { display: flex; overflow-x: auto; gap: 8px; padding-bottom: 4px; }
+  .strip-ph { flex: 0 0 104px; height: 104px; border-radius: 12px; overflow: hidden; background: #fbe4e8; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .strip-ph img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .review-avg { font-size: 14px; background: var(--pink-light); border-radius: 12px; padding: 10px 13px; margin-bottom: 12px; }
+  .review-avg b { color: var(--pink-deep); font-size: 17px; }
+  .review-sec { margin-bottom: 10px; }
+  .review-title { font-size: 12px; color: var(--muted); margin-bottom: 4px; font-weight: 700; }
+  .review-item { display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding: 6px 2px; border-bottom: 1px dashed #f9e3e8; }
+  .review-item:last-child { border-bottom: none; }
+  .review-item b { color: var(--pink-deep); }
+  .banner-btn { margin-top: 10px; background: rgba(255, 255, 255, .94); color: var(--pink-deep); border: none; border-radius: 12px; padding: 9px 16px; font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer; box-shadow: 0 2px 8px rgba(120, 20, 40, .18); }
+
   input[type=file] { display: none; }
 </style>
 </head>
@@ -260,6 +274,13 @@
       </div>
     </div>
     <div style="height:4px"></div>
+    <div class="card" id="homePhotoCard" style="display:none">
+      <h3>📸 我们的美好瞬间
+        <span style="flex:1"></span>
+        <button class="btn small ghost" onclick="app.go('diary')">全部日记</button>
+      </h3>
+      <div class="photo-strip" id="homePhotoStrip"></div>
+    </div>
     <div class="tip-box">💕 数据只保存在你们自己的手机里，不经过任何服务器。换手机或换人看数据，用「同步」页的同步码互相发一次就好。</div>
   </section>
 
@@ -313,7 +334,7 @@
         <div class="field"><label>美好的文字</label><textarea id="diaryText" maxlength="2000" placeholder="今天发生了什么值得记住的事?"></textarea></div>
         <div class="field"><label>照片(最多 9 张)</label>
           <div class="preview-grid" id="photoPreview"></div>
-          <button class="btn small ghost" onclick="document.getElementById('diaryFiles').click()">📷 添加照片</button>
+          <label class="photo-pick" for="diaryFiles">📷 点这里添加照片(可一次选多张)</label>
           <input type="file" id="diaryFiles" accept="image/*" multiple onchange="app.pickPhotos(this)">
         </div>
         <button class="btn" onclick="app.saveDiary()">保存日记</button>
@@ -343,6 +364,11 @@
     </div>
 
     <div class="card">
+      <h3>📊 经期复盘</h3>
+      <div id="periodReview"></div>
+    </div>
+
+    <div class="card">
       <h3>📝 记录经期
         <span style="flex:1"></span>
         <button class="btn small ghost" onclick="app.toggleForm('perForm', this)">＋ 记录</button>
@@ -350,11 +376,13 @@
       <div class="muted">第一次用？把最近一次经期开始的日子记下来就行，用得越多预测越准。</div>
       <div class="form-panel" id="perForm">
         <div class="divider"></div>
+        <div class="muted" id="perFormHint" style="display:none;margin-bottom:8px"></div>
         <div class="row">
-          <div class="field"><label>开始日期</label><input type="date" id="perStart"></div>
-          <div class="field"><label>结束日期（可空）</label><input type="date" id="perEnd"></div>
+          <div class="field"><label>开始日期(第一天)</label><input type="date" id="perStart"></div>
+          <div class="field"><label>结束日期(可留空)</label><input type="date" id="perEnd"></div>
         </div>
         <button class="btn" onclick="app.addPeriod()">保存记录</button>
+        <div class="muted" style="margin-top:8px">小技巧:来的当天只填「开始」;结束那天点顶部横幅的「今天结束了」,或回到这里补记结束日期,复盘就会越来越准。</div>
       </div>
       <div id="perList" style="margin-top:6px"></div>
     </div>
@@ -525,7 +553,36 @@
       $('homePeriodSub').textContent = '记得多喝热水、多休息';
     } else {
       $('homePeriodMain').textContent = '推迟约 ' + (-st.daysUntilNext) + ' 天';
-      $('homePeriodSub').textContent = '可能压力或作息变化，如长期异常建议就医';
+      $('homePeriodSub').textContent = '可能压力或作息变化,如长期异常建议就医';
+    }
+    /* 首页照片墙:最近的日记照片 */
+    const stripCard = $('homePhotoCard');
+    const strip = $('homePhotoStrip');
+    const photos = [];
+    const entries = (state.diary || []).slice().sort(function (a, b) {
+      return (b.date + (b.createdAt || '')).localeCompare(a.date + (a.createdAt || ''));
+    });
+    for (const d of entries) {
+      for (let i = 0; i < (d.photos || []).length; i++) {
+        photos.push({ entryId: d.id, idx: i, pid: d.photos[i].id });
+        if (photos.length >= 8) break;
+      }
+      if (photos.length >= 8) break;
+    }
+    if (photos.length) {
+      stripCard.style.display = 'block';
+      strip.innerHTML = photos.map(function (p) {
+        return '<div class="strip-ph" data-strip="' + p.pid + '" onclick="app.openStrip(\'' + p.entryId + '\',' + p.idx + ')"><div class="ph-loading">📷</div></div>';
+      }).join('');
+      (async function () {
+        for (const p of photos) {
+          const u = await photoURL(p.pid);
+          const el = strip.querySelector('[data-strip="' + p.pid + '"]');
+          if (el) { if (u) el.innerHTML = '<img src="' + u + '">'; else el.style.display = 'none'; }
+        }
+      })();
+    } else {
+      stripCard.style.display = 'none';
     }
   }
 
@@ -590,14 +647,14 @@
     const today = C.todayStr();
     const st = C.periodStats(state.periods, today);
     /* 顶部状态 */
-    let main, sub, calm = true;
-    if (!st.hasData) { main = '🌸 开始记录经期'; sub = '记录一次后，日历就会给出预测'; }
-    else if (st.inPeriodDay) { main = '💗 经期第 ' + st.inPeriodDay + ' 天'; sub = '预计 ' + C.addDays(st.lastStart, st.avgDuration - 1) + ' 结束 · 多休息'; calm = false; }
+    let main, sub, calm = true, act = '';
+    if (!st.hasData) { main = '🌸 开始记录经期'; sub = '记录一次后,日历就会给出预测'; }
+    else if (st.inPeriodDay) { main = '💗 经期第 ' + st.inPeriodDay + ' 天'; sub = '预计 ' + C.addDays(st.lastStart, st.avgDuration - 1) + ' 结束 · 多休息'; calm = false; act = '<button class="banner-btn" onclick="app.endPeriodToday()">今天结束了 ✓ 记录一下</button>'; }
     else if (st.daysUntilNext > 0) { main = '距下次经期约 ' + st.daysUntilNext + ' 天'; sub = '预测 ' + st.nextStart + ' 开始 · 周期约 ' + st.avgCycle + ' 天 · 经期约 ' + st.avgDuration + ' 天'; }
-    else if (st.daysUntilNext === 0) { main = '预测今天来 🌸'; sub = '别紧张，平常心'; calm = false; }
-    else { main = '预测已推迟 ' + (-st.daysUntilNext) + ' 天'; sub = '偶尔推迟很常见；如确认怀孕或有不适，请咨询医生'; calm = false; }
+    else if (st.daysUntilNext === 0) { main = '预测今天来 🌸'; sub = '别紧张,平常心'; calm = false; }
+    else { main = '预测已推迟 ' + (-st.daysUntilNext) + ' 天'; sub = '偶尔推迟很常见;如确认怀孕或有不适,请咨询医生'; calm = false; }
     $('periodBanner').innerHTML =
-      '<div class="status-banner' + (calm ? ' calm' : '') + '"><div class="main-line">' + main + '</div><div class="sub-line">' + sub + '</div></div>';
+      '<div class="status-banner' + (calm ? ' calm' : '') + '"><div class="main-line">' + main + '</div><div class="sub-line">' + sub + '</div>' + act + '</div>';
 
     /* 日历 */
     $('calYm').textContent = calY + ' 年 ' + calM + ' 月';
@@ -611,6 +668,39 @@
     }
     $('calGrid').innerHTML = html;
 
+    /* 经期复盘:每次几天 + 每个周期多少天 */
+    const fmtMd = function (s) { return s.slice(5).replace('-', '/'); };
+    const ended = state.periods.filter(function (p) { return !p.deleted && p.end; })
+      .sort(function (a, b) { return b.start.localeCompare(a.start); });
+    const allStarts = state.periods.filter(function (p) { return !p.deleted; })
+      .map(function (p) { return p.start; }).sort();
+    const cycles = [];
+    for (let i = 1; i < allStarts.length; i++) {
+      const gap = C.daysBetween(allStarts[i - 1], allStarts[i]);
+      if (gap >= 20 && gap <= 45) cycles.push({ from: allStarts[i - 1], to: allStarts[i], gap: gap });
+    }
+    let rev = '<div class="review-avg">平均经期 <b>' + st.avgDuration + ' 天</b> · 平均周期 <b>' + st.avgCycle + ' 天</b>'
+      + (st.cyclesUsed.length ? ' · 按最近 ' + st.cyclesUsed.length + ' 个周期计算' : ' · 记录 2 次后更准') + '</div>';
+    rev += '<div class="review-sec"><div class="review-title">每次经期持续</div>';
+    if (ended.length) {
+      rev += ended.slice(0, 6).map(function (p) {
+        return '<div class="review-item"><span>' + fmtMd(p.start) + ' 开始那次</span><b>' + (C.daysBetween(p.start, p.end) + 1) + ' 天</b></div>';
+      }).join('');
+    } else {
+      rev += '<div class="muted">结束那天点横幅「今天结束了」或补记结束日,这里就会显示每次几天</div>';
+    }
+    rev += '</div>';
+    rev += '<div class="review-sec"><div class="review-title">每个周期天数(两次开始间隔)</div>';
+    if (cycles.length) {
+      rev += cycles.slice(-6).reverse().map(function (c) {
+        return '<div class="review-item"><span>' + fmtMd(c.from) + ' → ' + fmtMd(c.to) + '</span><b>' + c.gap + ' 天</b></div>';
+      }).join('');
+    } else {
+      rev += '<div class="muted">记录第 2 次经期后,这里会显示每个周期是 28、29 还是 30 天</div>';
+    }
+    rev += '</div>';
+    $('periodReview').innerHTML = rev;
+
     /* 历史记录(倒序) */
     const list = state.periods.filter(p => !p.deleted).slice().sort((a, b) => b.start.localeCompare(a.start));
     $('perList').innerHTML = list.length
@@ -621,6 +711,7 @@
           return '<div class="list-item"><div class="info">' +
             '<div class="name">' + p.start + (p.end ? ' ~ ' + p.end : '') + '</div>' +
             '<div class="date">' + (len ? '共 ' + len + ' 天' : '未记结束') + (gap ? ' · 距上次 ' + gap + ' 天' : '') + '</div></div>' +
+            (p.end ? '' : '<button class="btn small ghost" style="padding:6px 10px;font-size:12px;margin-right:8px" onclick="app.fixEnd(\'' + p.start + '\')">补记结束</button>') +
             '<button class="del-btn" onclick="app.delPeriod(\'' + p.start + '\')">✕</button></div>';
         }).join('')
       : '<div class="muted">还没有记录</div>';
@@ -702,6 +793,7 @@
   const IDENTITY_KEY = 'lovedays.identity.v1';
   let identity = localStorage.getItem(IDENTITY_KEY) || '';
   let pendingPhotos = [];
+  let photoBusy = 0;
   const photoURLs = {};
 
   function authorName(by) { return (state.names && (state.names[by] || '')) || (by === 'a' ? '我' : '你'); }
@@ -815,7 +907,7 @@
       const p = $(id);
       p.classList.toggle('open');
       if (p.classList.contains('open')) {
-        if (id === 'perForm') { $('perStart').value = C.todayStr(); }
+        if (id === 'perForm') { $('perStart').value = C.todayStr(); $('perFormHint').style.display = 'none'; }
         if (id === 'annForm') { $('annDate').value = C.todayStr(); }
       }
     },
@@ -856,6 +948,7 @@
       else state.periods.push({ start, end: end || '', updatedAt: Date.now() });
       save();
       $('perEnd').value = '';
+      $('perFormHint').style.display = 'none';
       app.toggleForm('perForm');
       calY = start.slice(0, 4) | 0; calM = start.slice(5, 7) | 0;
       renderAll(); toast('已记录 🌸 预测已更新');
@@ -974,14 +1067,20 @@
       if (!files.length) return;
       if (!identity) { toast('先在「同步」页选好这台手机是谁的'); return app.go('sync'); }
       if (!window.LoveCloud.media) { toast('当前环境不支持存储照片,请换正常浏览器'); return; }
-      for (const f of files) {
-        if (pendingPhotos.length >= 9) { toast('一次最多 9 张照片'); break; }
-        try {
-          const r = await compressPhoto(f);
-          pendingPhotos.push({ id: 'p' + Date.now() + Math.random().toString(36).slice(2, 6), blob: r.blob, w: r.w, h: r.h, url: URL.createObjectURL(r.blob) });
-        } catch (e) { toast('有图片不支持,已跳过'); }
+      photoBusy++;
+      try {
+        for (const f of files) {
+          if (pendingPhotos.length >= 9) { toast('一次最多 9 张照片'); break; }
+          try {
+            const r = await compressPhoto(f);
+            pendingPhotos.push({ id: 'p' + Date.now() + Math.random().toString(36).slice(2, 6), blob: r.blob, w: r.w, h: r.h, url: URL.createObjectURL(r.blob) });
+            renderPhotoPreview();
+          } catch (e) { toast('有图片不支持,已跳过'); }
+        }
+      } finally {
+        photoBusy--;
+        renderPhotoPreview();
       }
-      renderPhotoPreview();
     },
 
     removePendingPhoto(id) {
@@ -995,6 +1094,7 @@
       const text = $('diaryText').value.trim();
       const date = $('diaryDate').value || C.todayStr();
       if (!text && !pendingPhotos.length) return toast('写点什么或选张照片吧');
+      if (photoBusy > 0) return toast('照片还在处理中,一秒后再点保存');
       for (const p of pendingPhotos) {
         try { await window.LoveCloud.media.put(p.id, p.blob); }
         catch (e) { return toast('照片存储失败,请重试'); }
@@ -1042,7 +1142,36 @@
       });
     },
 
-    closeLightbox() { $('lightbox').classList.remove('open'); }
+    closeLightbox() { $('lightbox').classList.remove('open'); },
+
+    endPeriodToday() {
+      const today = C.todayStr();
+      const st = C.periodStats(state.periods, today);
+      if (!st.inPeriodDay) return toast('当前不在经期中,无需记录结束');
+      if (!confirm('把 ' + today + ' 记为这次经期(' + st.lastStart + ' 开始)的结束日?')) return;
+      const rec = state.periods.find(function (p) { return p.start === st.lastStart; });
+      if (!rec) return toast('没找到对应的开始记录');
+      if (rec.end && rec.end >= today) return toast('这条已经记过结束日了');
+      rec.end = today;
+      rec.updatedAt = Date.now();
+      save(); renderAll(); toast('已记录:这次经期 ' + (C.daysBetween(rec.start, today) + 1) + ' 天 ✅');
+    },
+
+    fixEnd(start) {
+      const p = $('perForm');
+      if (!p.classList.contains('open')) app.toggleForm('perForm');
+      $('perStart').value = start;
+      $('perEnd').value = '';
+      const hint = $('perFormHint');
+      hint.textContent = '正在为 ' + start + ' 开始的经期补记结束日:选好结束日期后点保存';
+      hint.style.display = 'block';
+      p.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    },
+
+    openStrip(entryId, idx) {
+      app.go('diary');
+      setTimeout(function () { app.showPhoto(entryId, idx); }, 150);
+    }
   };
 
   function fallbackCopy(text, done) {
