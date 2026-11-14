@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#ff6b81">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="小日子">
+<title>我们的小日子</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23ff6b81'/%3E%3Cpath d='M50 78C30 62 18 51 18 38c0-10 8-17 17-17 6 0 12 3 15 9 3-6 9-9 15-9 9 0 17 7 17 17 0 13-12 24-32 40z' fill='white'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --pink: #ff6b81;
+    --pink-deep: #f0425e;
+    --pink-light: #ffe9ee;
+    --pink-bg: #fff4f6;
+    --text: #4a3b3e;
+    --muted: #b08e95;
+    --card: #ffffff;
+    --radius: 18px;
+    --danger: #e05656;
+    --orange: #ff9f43;
+    --purple: #9b7ede;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Microsoft YaHei", sans-serif;
+    background: var(--pink-bg);
+    color: var(--text);
+    padding-bottom: calc(84px + env(safe-area-inset-bottom));
+    max-width: 520px;
+    margin: 0 auto;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* ---------- 头部 ---------- */
+  header {
+    background: linear-gradient(135deg, #ff8a9e 0%, #ff5f7e 60%, #ff7d9c 100%);
+    color: #fff;
+    padding: calc(14px + env(safe-area-inset-top)) 20px 18px;
+    border-radius: 0 0 26px 26px;
+    box-shadow: 0 6px 20px rgba(255, 107, 129, .25);
+  }
+  header .app-title { font-size: 15px; opacity: .92; letter-spacing: 1px; }
+  header .couple {
+    font-size: 21px; font-weight: 700; margin-top: 6px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  header .couple .heart { font-size: 17px; }
+  header .couple .placeholder { font-size: 14px; font-weight: 400; opacity: .9; }
+  main { padding: 14px 16px; }
+  .tab-page { display: none; animation: fadeIn .22s ease; }
+  .tab-page.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: none;} }
+
+  /* ---------- 卡片 ---------- */
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 18px;
+    margin-bottom: 14px;
+    box-shadow: 0 2px 14px rgba(240, 66, 94, .07);
+  }
+  .card h3 { font-size: 14px; color: var(--muted); font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  .muted { color: var(--muted); font-size: 13px; }
+
+  /* 首页大数字 */
+  .big-days { text-align: center; padding: 26px 18px 22px; }
+  .big-days .label { font-size: 14px; color: var(--muted); letter-spacing: 4px; }
+  .big-days .num {
+    font-size: 64px; font-weight: 800; line-height: 1.15;
+    background: linear-gradient(135deg, #ff8a9e, #f0425e);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    font-variant-numeric: tabular-nums;
+  }
+  .big-days .since { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .mini-card { background: var(--card); border-radius: var(--radius); padding: 15px; box-shadow: 0 2px 14px rgba(240,66,94,.07); }
+  .mini-card .k { font-size: 12px; color: var(--muted); margin-bottom: 6px; display: flex; align-items: center; gap: 5px; }
+  .mini-card .v { font-size: 16px; font-weight: 700; color: var(--text); line-height: 1.4; }
+  .mini-card .s { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .mini-card .v.pink { color: var(--pink-deep); }
+
+  /* 列表 */
+  .list-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 13px 4px; border-bottom: 1px solid #fdf0f2; gap: 8px;
+  }
+  .list-item:last-child { border-bottom: none; }
+  .list-item .info { flex: 1; min-width: 0; }
+  .list-item .name { font-size: 15px; font-weight: 600; }
+  .list-item .date { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .badge {
+    flex-shrink: 0; text-align: center;
+    background: var(--pink-light); color: var(--pink-deep);
+    border-radius: 12px; padding: 6px 12px; font-size: 13px; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .badge.today { background: linear-gradient(135deg,#ff8a9e,#f0425e); color: #fff; }
+  .badge.gray { background: #f5eff0; color: var(--muted); font-weight: 500; }
+  .del-btn {
+    flex-shrink: 0; width: 26px; height: 26px; border: none; border-radius: 50%;
+    background: #fbe4e8; color: var(--danger); font-size: 15px; line-height: 1; cursor: pointer;
+  }
+
+  /* 按钮 & 表单 */
+  .btn {
+    display: inline-block; border: none; cursor: pointer;
+    background: linear-gradient(135deg, #ff8a9e, #f0425e);
+    color: #fff; font-size: 15px; font-weight: 600;
+    border-radius: 14px; padding: 12px 18px; width: 100%;
+    box-shadow: 0 4px 14px rgba(240, 66, 94, .25);
+    font-family: inherit;
+  }
+  .btn:active { transform: scale(.98); }
+  .btn.small { width: auto; padding: 9px 16px; font-size: 14px; }
+  .btn.ghost { background: #fff; color: var(--pink-deep); border: 1.5px solid #ffc9d3; box-shadow: none; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 5px; font-weight: 600; }
+  .field input[type=date], .field input[type=text], .field input[type=number], textarea {
+    width: 100%; border: 1.5px solid #ffd6de; border-radius: 12px;
+    padding: 11px 12px; font-size: 16px; color: var(--text);
+    background: #fffdfD; font-family: inherit; outline: none;
+    -webkit-appearance: none; appearance: none;
+  }
+  .field input:focus, textarea:focus { border-color: var(--pink); }
+  textarea { resize: vertical; min-height: 90px; font-size: 13px; word-break: break-all; }
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+  .form-panel { display: none; margin-top: 12px; }
+  .form-panel.open { display: block; }
+  .seg { display: flex; background: #fbe4e8; border-radius: 12px; padding: 3px; }
+  .seg button {
+    flex: 1; border: none; background: transparent; padding: 8px 0;
+    font-size: 14px; color: var(--muted); border-radius: 10px; font-weight: 600; font-family: inherit; cursor: pointer;
+  }
+  .seg button.on { background: #fff; color: var(--pink-deep); box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+
+  /* ---------- 日历 ---------- */
+  .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .cal-head .ym { font-size: 16px; font-weight: 700; }
+  .cal-head button {
+    width: 34px; height: 34px; border: none; border-radius: 50%;
+    background: var(--pink-light); color: var(--pink-deep); font-size: 16px; cursor: pointer;
+  }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+  .cal-grid .dow { text-align: center; font-size: 11px; color: var(--muted); padding: 4px 0; }
+  .cell { position: relative; aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; }
+  .cell .d {
+    width: 34px; height: 34px; max-width: 100%; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; color: var(--text); font-variant-numeric: tabular-nums;
+  }
+  .cell.empty .d { visibility: hidden; }
+  .cell.out { opacity: .35; }
+  .cell.period .d { background: linear-gradient(135deg, #ff8a9e, #f0425e); color: #fff; font-weight: 700; }
+  .cell.predicted .d { border: 1.5px dashed var(--pink); color: var(--pink-deep); }
+  .cell.fertile .d { background: #fff1e0; color: #e07b00; }
+  .cell.ovulation .d { background: #efe9fc; color: var(--purple); font-weight: 700; border: 1.5px solid var(--purple); }
+  .cell.today .d { box-shadow: 0 0 0 2px var(--text); font-weight: 700; }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; font-size: 11.5px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 4px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .dot.period { background: #f0425e; }
+  .dot.predicted { background: transparent; border: 1.5px dashed var(--pink); }
+  .dot.fertile { background: #ffcf9e; }
+  .dot.ovulation { background: var(--purple); }
+
+  .status-banner {
+    border-radius: var(--radius); padding: 18px; margin-bottom: 14px;
+    background: linear-gradient(135deg, #ff8a9e, #f0425e); color: #fff;
+    box-shadow: 0 4px 16px rgba(240,66,94,.22);
+  }
+  .status-banner .main-line { font-size: 19px; font-weight: 700; }
+  .status-banner .sub-line { font-size: 13px; opacity: .92; margin-top: 6px; }
+  .status-banner.calm { background: linear-gradient(135deg, #ffc3cf, #ff9fb4); }
+
+  /* ---------- 底部导航 ---------- */
+  nav {
+    position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 100%; max-width: 520px; z-index: 50;
+    background: rgba(255, 255, 255, .96);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid #ffe4ea;
+    display: flex; padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+  }
+  nav button {
+    flex: 1; border: none; background: none; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    font-size: 10.5px; color: var(--muted); padding: 5px 0; font-family: inherit;
+  }
+  nav button .ico { font-size: 21px; line-height: 1; filter: grayscale(.4); opacity: .75; }
+  nav button.on { color: var(--pink-deep); font-weight: 700; }
+  nav button.on .ico { filter: none; opacity: 1; transform: scale(1.08); transition: .15s; }
+
+  /* 提示条 */
+  #toast {
+    position: fixed; top: calc(16px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+    background: rgba(74, 59, 62, .92); color: #fff; font-size: 14px;
+    border-radius: 20px; padding: 10px 20px; z-index: 99;
+    opacity: 0; pointer-events: none; transition: opacity .25s; max-width: 80vw; text-align: center;
+  }
+  #toast.show { opacity: 1; }
+
+  .tip-box { background: var(--pink-light); border-radius: 12px; padding: 11px 13px; font-size: 12.5px; color: #a06a76; line-height: 1.65; }
+  .divider { height: 1px; background: #fdf0f2; margin: 12px 0; }
+  .center { text-align: center; }
+  input[type=file] { display: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="app-title">我们的小日子</div>
+  <div class="couple" id="coupleLine"><span class="placeholder">去「同步」页写下你们俩的名字吧</span></div>
+</header>
+
+<main>
+  <!-- ================= 首页 ================= -->
+  <section class="tab-page active" id="page-home">
+    <div class="card big-days">
+      <div class="label">已在一起</div>
+      <div class="num" id="homeDays">—</div>
+      <div class="since" id="homeSince">先去「纪念日」页设置你们在一起的日子</div>
+    </div>
+    <div class="two-col">
+      <div class="mini-card" id="homeAnnCard">
+        <div class="k">🎉 下一个纪念日</div>
+        <div class="v pink" id="homeAnnName">—</div>
+        <div class="s" id="homeAnnSub"></div>
+      </div>
+      <div class="mini-card" id="homePeriodCard">
+        <div class="k">🌸 经期小提醒</div>
+        <div class="v" id="homePeriodMain">—</div>
+        <div class="s" id="homePeriodSub"></div>
+      </div>
+    </div>
+    <div style="height:4px"></div>
+    <div class="tip-box">💕 数据只保存在你们自己的手机里，不经过任何服务器。换手机或换人看数据，用「同步」页的同步码互相发一次就好。</div>
+  </section>
+
+  <!-- ================= 纪念日 ================= -->
+  <section class="tab-page" id="page-ann">
+    <div class="card">
+      <h3>💞 在一起的日子</h3>
+      <div class="field" style="margin-bottom:0">
+        <input type="date" id="togetherInput" onchange="app.setTogether(this.value)">
+      </div>
+      <div class="muted" style="margin-top:8px" id="togetherInfo"></div>
+    </div>
+
+    <div class="card">
+      <h3>🎂 恋爱周年（自动）</h3>
+      <div id="loveAnnBox"></div>
+    </div>
+
+    <div class="card">
+      <h3>✨ 我们的纪念日
+        <span style="flex:1"></span>
+        <button class="btn small ghost" onclick="app.toggleForm('annForm', this)">＋ 添加</button>
+      </h3>
+      <div id="annList"></div>
+      <div class="form-panel" id="annForm">
+        <div class="divider"></div>
+        <div class="field"><label>叫什么（如：老婆生日）</label><input type="text" id="annName" maxlength="20" placeholder="名字"></div>
+        <div class="field"><label>日期</label><input type="date" id="annDate"></div>
+        <div class="field"><label>重复</label>
+          <div class="seg">
+            <button type="button" id="segYearly" class="on" onclick="app.setRepeat('yearly')">每年重复</button>
+            <button type="button" id="segOnce" onclick="app.setRepeat('once')">只记一次</button>
+          </div>
+        </div>
+        <button class="btn" onclick="app.addAnn()">保存纪念日</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 经期 ================= -->
+  <section class="tab-page" id="page-period">
+    <div id="periodBanner"></div>
+
+    <div class="card">
+      <div class="cal-head">
+        <button onclick="app.calNav(-1)">‹</button>
+        <div class="ym" id="calYm"></div>
+        <button onclick="app.calNav(1)">›</button>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+      <div class="legend">
+        <span><i class="dot period"></i>经期（已记录）</span>
+        <span><i class="dot predicted"></i>经期（预测）</span>
+        <span><i class="dot fertile"></i>易孕期</span>
+        <span><i class="dot ovulation"></i>排卵日</span>
+      </div>
+      <div class="muted" style="margin-top:8px">预测仅供参考，以实际身体情况为准。</div>
+    </div>
+
+    <div class="card">
+      <h3>📝 记录经期
+        <span style="flex:1"></span>
+        <button class="btn small ghost" onclick="app.toggleForm('perForm', this)">＋ 记录</button>
+      </h3>
+      <div class="muted">第一次用？把最近一次经期开始的日子记下来就行，用得越多预测越准。</div>
+      <div class="form-panel" id="perForm">
+        <div class="divider"></div>
+        <div class="row">
+          <div class="field"><label>开始日期</label><input type="date" id="perStart"></div>
+          <div class="field"><label>结束日期（可空）</label><input type="date" id="perEnd"></div>
+        </div>
+        <button class="btn" onclick="app.addPeriod()">保存记录</button>
+      </div>
+      <div id="perList" style="margin-top:6px"></div>
+    </div>
+  </section>
+
+  <!-- ================= 同步 ================= -->
+  <section class="tab-page" id="page-sync">
+    <div class="card">
+      <h3>👫 我们的名字</h3>
+      <div class="row">
+        <div class="field" style="margin-bottom:0"><label>你的称呼</label><input type="text" id="nameA" maxlength="8" placeholder="如：老公"></div>
+        <div class="field" style="margin-bottom:0"><label>她的称呼</label><input type="text" id="nameB" maxlength="8" placeholder="如：老婆"></div>
+      </div>
+      <button class="btn small" style="margin-top:12px" onclick="app.saveNames()">保存称呼</button>
+    </div>
+
+    <div class="card">
+      <h3>💑 两台手机同步数据</h3>
+      <div class="tip-box" style="margin-bottom:12px">手机之间不联网、不经过服务器：把同步码复制后用微信发给对方，对方复制后点「导入」即可合并双方数据。每次记完经期，发一次码就好。</div>
+      <button class="btn" onclick="app.genCode()">生成我的同步码</button>
+      <div class="field" style="margin-top:12px">
+        <textarea id="syncOut" readonly placeholder="点上面的按钮，同步码会出现在这里"></textarea>
+      </div>
+      <button class="btn ghost small" onclick="app.copyCode()">复制同步码</button>
+      <div class="divider"></div>
+      <div class="field"><textarea id="syncIn" placeholder="把对方发来的同步码粘贴到这里"></textarea></div>
+      <button class="btn small" onclick="app.importCode()">导入对方的数据</button>
+    </div>
+
+    <div class="card">
+      <h3>💾 数据备份（重要）</h3>
+      <div class="muted" style="margin-bottom:12px">数据存在手机浏览器里，强烈建议每月导出一次备份文件，存到微信收藏，换手机也不怕丢。</div>
+      <div class="row">
+        <button class="btn small" onclick="app.exportData()">导出备份文件</button>
+        <button class="btn small ghost" onclick="document.getElementById('importFile').click()">导入备份文件</button>
+      </div>
+      <input type="file" id="importFile" accept=".json,application/json" onchange="app.importDataFile(this)">
+    </div>
+
+    <div class="card" id="installCard" style="display:none">
+      <h3>📲 安装到手机桌面（像 App 一样）</h3>
+      <div id="installIos" style="display:none" class="muted">
+        用 <b>Safari</b> 打开本页 → 点底部中间的「分享」按钮 → 往下滑点「<b>添加到主屏幕</b>」→ 完成。桌面上就会出现心形图标。
+      </div>
+      <div id="installAndroid" style="display:none" class="muted">
+        点浏览器右上角「<b>⋮ 菜单</b>」→ 找到「<b>添加到桌面 / 添加到主屏幕</b>」→ 完成。桌面上就会出现心形图标。
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>💗 关于</h3>
+      <div class="muted" style="line-height:1.8">
+        我们的小日子 · 情侣纪念日 & 经期小助手<br>
+        纯本地网页应用：零广告、零收费、零服务器，不会停运。<br>
+        只要不清除浏览器数据、记得定期备份，就能一直用下去。
+      </div>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <button class="on" data-tab="home" onclick="app.go('home')"><span class="ico">❤️</span>首页</button>
+  <button data-tab="ann" onclick="app.go('ann')"><span class="ico">🎉</span>纪念日</button>
+  <button data-tab="period" onclick="app.go('period')"><span class="ico">🌸</span>经期</button>
+  <button data-tab="sync" onclick="app.go('sync')"><span class="ico">🤝</span>同步</button>
+</nav>
+
+<div id="toast"></div>
+
+<script src="core.js"></script>
+<script>
+(function () {
+  'use strict';
+  const C = window.LoveCore;
+  const KEY = 'lovedays.state.v1';
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  function load() {
+    try {
+      const s = JSON.parse(localStorage.getItem(KEY));
+      if (s && typeof s === 'object') return Object.assign(C.emptyState(), s);
+    } catch (e) {}
+    return C.emptyState();
+  }
+  function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
+
+  let state = load();
+  let calY = C.todayStr().slice(0, 4) | 0;
+  let calM = (C.todayStr().slice(5, 7) | 0);
+  let repeatMode = 'yearly';
+  let toastTimer = null;
+
+  function toast(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  /* ---------- 各页渲染 ---------- */
+
+  function renderHome() {
+    const today = C.todayStr();
+    if (state.togetherSince) {
+      const n = $('homeDays');
+      n.textContent = C.togetherDays(state.togetherSince, today);
+      n.style.background = ''; n.style.webkitTextFillColor = '';
+      $('homeSince').textContent = '自 ' + state.togetherSince + ' 起 · ' + esc(state.names.a || '我们') + ' & ' + esc(state.names.b || '你');
+    } else {
+      const n = $('homeDays');
+      n.textContent = '💗';
+      n.style.background = 'none'; n.style.webkitTextFillColor = 'initial';
+      $('homeSince').textContent = '先去「纪念日」页设置你们在一起的日子';
+    }
+    /* 最近的纪念日 */
+    const items = annListSorted(today);
+    if (items.length) {
+      const it = items[0];
+      $('homeAnnName').textContent = it.name;
+      $('homeAnnSub').textContent = it.label;
+    } else {
+      $('homeAnnName').textContent = state.togetherSince ? '恋爱周年见 👀' : '还没有纪念日';
+      $('homeAnnSub').textContent = state.togetherSince ? '' : '去「纪念日」页添加吧';
+    }
+    /* 经期 */
+    const st = C.periodStats(state.periods, today);
+    if (!st.hasData) {
+      $('homePeriodMain').textContent = '还没有记录';
+      $('homePeriodSub').textContent = '去「经期」页开始记录';
+    } else if (st.inPeriodDay) {
+      $('homePeriodMain').textContent = '经期第 ' + st.inPeriodDay + ' 天';
+      $('homePeriodSub').textContent = '预计 ' + C.addDays(st.lastStart, st.avgDuration - 1) + ' 结束';
+    } else if (st.daysUntilNext > 0) {
+      $('homePeriodMain').textContent = '约 ' + st.daysUntilNext + ' 天后来';
+      $('homePeriodSub').textContent = '预测 ' + st.nextStart + ' · 周期约 ' + st.avgCycle + ' 天';
+    } else if (st.daysUntilNext === 0) {
+      $('homePeriodMain').textContent = '预测今天来 🌸';
+      $('homePeriodSub').textContent = '记得多喝热水、多休息';
+    } else {
+      $('homePeriodMain').textContent = '推迟约 ' + (-st.daysUntilNext) + ' 天';
+      $('homePeriodSub').textContent = '可能压力或作息变化，如长期异常建议就医';
+    }
+  }
+
+  function annListSorted(today) {
+    const list = [];
+    /* 恋爱周年固定第一条 */
+    if (state.togetherSince) {
+      const a = C.nextAnniversaryOfLove(state.togetherSince, today);
+      list.push({
+        name: '恋爱纪念日',
+        label: a.date + ' · ' + (a.daysLeft === 0 ? '今天！' : '还有 ' + a.daysLeft + ' 天'),
+        daysLeft: a.daysLeft,
+        date: a.date, del: false
+      });
+    }
+    for (const a of state.anniversaries) {
+      if (a.deleted) continue;
+      const next = C.nextOccurrence(a.date, a.repeat, today);
+      if (!next) continue;
+      const left = C.daysBetween(today, next);
+      list.push({
+        id: a.id, name: a.name,
+        label: next + (a.repeat === 'yearly' ? ' · 每年' : '') + ' · ' + (left === 0 ? '就是今天！' : '还有 ' + left + ' 天'),
+        daysLeft: left, del: true
+      });
+    }
+    list.sort((x, y) => x.daysLeft - y.daysLeft);
+    return list;
+  }
+
+  function renderAnn() {
+    const today = C.todayStr();
+    if (state.togetherSince) {
+      $('togetherInput').value = state.togetherSince;
+      const t = C.togetherDays(state.togetherSince, today);
+      $('togetherInfo').textContent = '今天是在一起的第 ' + t + ' 天 💞';
+    } else {
+      $('togetherInfo').textContent = '设定后，首页会显示在一起天数，恋爱周年也会自动生成。';
+    }
+    /* 恋爱周年卡 */
+    if (state.togetherSince) {
+      const a = C.nextAnniversaryOfLove(state.togetherSince, today);
+      $('loveAnnBox').innerHTML =
+        '<div class="list-item"><div class="info"><div class="name">第 ' + a.years + ' 个恋爱周年</div>' +
+        '<div class="date">' + a.date + '</div></div>' +
+        '<div class="badge' + (a.daysLeft === 0 ? ' today' : '') + '">' + (a.daysLeft === 0 ? '今天 🎉' : a.daysLeft + ' 天') + '</div></div>';
+    } else {
+      $('loveAnnBox').innerHTML = '<div class="muted">先设置上面的日期</div>';
+    }
+    /* 自定义列表 */
+    const items = annListSorted(today).filter(x => x.del);
+    $('annList').innerHTML = items.length
+      ? items.map(it =>
+          '<div class="list-item"><div class="info"><div class="name">' + esc(it.name) + '</div>' +
+          '<div class="date">' + esc(it.label) + '</div></div>' +
+          '<div class="badge' + (it.daysLeft === 0 ? ' today' : '') + '">' + (it.daysLeft === 0 ? '🎉' : it.daysLeft + '天') + '</div>' +
+          '<button class="del-btn" onclick="app.delAnn(\'' + it.id + '\')">✕</button></div>').join('')
+      : '<div class="muted">还没有自定义纪念日，点右上角「＋ 添加」</div>';
+  }
+
+  function renderPeriod() {
+    const today = C.todayStr();
+    const st = C.periodStats(state.periods, today);
+    /* 顶部状态 */
+    let main, sub, calm = true;
+    if (!st.hasData) { main = '🌸 开始记录经期'; sub = '记录一次后，日历就会给出预测'; }
+    else if (st.inPeriodDay) { main = '💗 经期第 ' + st.inPeriodDay + ' 天'; sub = '预计 ' + C.addDays(st.lastStart, st.avgDuration - 1) + ' 结束 · 多休息'; calm = false; }
+    else if (st.daysUntilNext > 0) { main = '距下次经期约 ' + st.daysUntilNext + ' 天'; sub = '预测 ' + st.nextStart + ' 开始 · 周期约 ' + st.avgCycle + ' 天 · 经期约 ' + st.avgDuration + ' 天'; }
+    else if (st.daysUntilNext === 0) { main = '预测今天来 🌸'; sub = '别紧张，平常心'; calm = false; }
+    else { main = '预测已推迟 ' + (-st.daysUntilNext) + ' 天'; sub = '偶尔推迟很常见；如确认怀孕或有不适，请咨询医生'; calm = false; }
+    $('periodBanner').innerHTML =
+      '<div class="status-banner' + (calm ? ' calm' : '') + '"><div class="main-line">' + main + '</div><div class="sub-line">' + sub + '</div></div>';
+
+    /* 日历 */
+    $('calYm').textContent = calY + ' 年 ' + calM + ' 月';
+    const dows = ['日', '一', '二', '三', '四', '五', '六'];
+    let html = dows.map(d => '<div class="dow">' + d + '</div>').join('');
+    for (const cell of C.monthGrid(calY, calM)) {
+      if (!cell) { html += '<div class="cell empty"><div class="d"></div></div>'; continue; }
+      const s = C.statusForDate(cell, state.periods, today, 3);
+      const cls = ['cell', s || '', cell === today ? 'today' : ''].filter(Boolean).join(' ');
+      html += '<div class="' + cls + '" title="' + cell + '"><div class="d">' + (cell.slice(8) | 0) + '</div></div>';
+    }
+    $('calGrid').innerHTML = html;
+
+    /* 历史记录(倒序) */
+    const list = state.periods.filter(p => !p.deleted).slice().sort((a, b) => b.start.localeCompare(a.start));
+    $('perList').innerHTML = list.length
+      ? list.map((p, idx) => {
+          const next = list[idx + 1];
+          const gap = next ? C.daysBetween(next.start, p.start) : null;
+          const len = p.end ? C.daysBetween(p.start, p.end) + 1 : null;
+          return '<div class="list-item"><div class="info">' +
+            '<div class="name">' + p.start + (p.end ? ' ~ ' + p.end : '') + '</div>' +
+            '<div class="date">' + (len ? '共 ' + len + ' 天' : '未记结束') + (gap ? ' · 距上次 ' + gap + ' 天' : '') + '</div></div>' +
+            '<button class="del-btn" onclick="app.delPeriod(\'' + p.start + '\')">✕</button></div>';
+        }).join('')
+      : '<div class="muted">还没有记录</div>';
+  }
+
+  function renderSync() {
+    $('nameA').value = state.names.a || '';
+    $('nameB').value = state.names.b || '';
+    renderCoupleLine();
+    /* 安装引导 */
+    const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    if (!standalone) {
+      $('installCard').style.display = 'block';
+      const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+      $('installIos').style.display = ios ? 'block' : 'none';
+      $('installAndroid').style.display = ios ? 'none' : 'block';
+    }
+  }
+
+  function renderCoupleLine() {
+    const a = state.names.a, b = state.names.b;
+    $('coupleLine').innerHTML = (a || b)
+      ? esc(a || '我') + ' <span class="heart">❤️</span> ' + esc(b || '你')
+      : '<span class="placeholder">去「同步」页写下你们俩的名字吧</span>';
+  }
+
+  function renderAll() { renderHome(); renderAnn(); renderPeriod(); renderSync(); }
+
+  /* ---------- 对外动作 ---------- */
+
+  const app = {
+    go(tab) {
+      document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+      $('page-' + tab).classList.add('active');
+      if (tab === 'home') renderHome();
+      if (tab === 'ann') renderAnn();
+      if (tab === 'period') renderPeriod();
+      if (tab === 'sync') renderSync();
+      window.scrollTo(0, 0);
+    },
+
+    setTogether(v) {
+      if (!v) return;
+      state.togetherSince = v;
+      state.meta.updatedTogether = Date.now();
+      save(); renderAll(); toast('已保存 💞');
+    },
+
+    toggleForm(id, btn) {
+      const p = $(id);
+      p.classList.toggle('open');
+      if (p.classList.contains('open')) {
+        if (id === 'perForm') { $('perStart').value = C.todayStr(); }
+        if (id === 'annForm') { $('annDate').value = C.todayStr(); }
+      }
+    },
+
+    setRepeat(m) {
+      repeatMode = m;
+      $('segYearly').classList.toggle('on', m === 'yearly');
+      $('segOnce').classList.toggle('on', m === 'once');
+    },
+
+    addAnn() {
+      const name = $('annName').value.trim();
+      const date = $('annDate').value;
+      if (!name) return toast('先写个名字吧');
+      if (!date) return toast('选一下日期');
+      state.anniversaries.push({ id: 'a' + Date.now() + Math.random().toString(36).slice(2, 6), name, date, repeat: repeatMode, updatedAt: Date.now() });
+      save();
+      $('annName').value = '';
+      app.toggleForm('annForm');
+      renderAll(); toast('纪念日已添加 🎉');
+    },
+
+    delAnn(id) {
+      if (!confirm('确定删除这个纪念日吗？')) return;
+      const it = state.anniversaries.find(a => a.id === id);
+      if (it) { it.deleted = true; it.updatedAt = Date.now(); }
+      save(); renderAll(); toast('已删除');
+    },
+
+    addPeriod() {
+      const start = $('perStart').value;
+      const end = $('perEnd').value;
+      if (!start) return toast('选一下开始日期');
+      if (end && C.daysBetween(start, end) < 0) return toast('结束日期不能早于开始');
+      if (end && C.daysBetween(start, end) > 13) return toast('经期超过 14 天，请检查日期');
+      const old = state.periods.find(p => p.start === start);
+      if (old) { old.end = end || ''; old.deleted = false; old.updatedAt = Date.now(); }
+      else state.periods.push({ start, end: end || '', updatedAt: Date.now() });
+      save();
+      $('perEnd').value = '';
+      app.toggleForm('perForm');
+      calY = start.slice(0, 4) | 0; calM = start.slice(5, 7) | 0;
+      renderAll(); toast('已记录 🌸 预测已更新');
+    },
+
+    delPeriod(start) {
+      if (!confirm('删除这条经期记录？')) return;
+      const it = state.periods.find(p => p.start === start);
+      if (it) { it.deleted = true; it.updatedAt = Date.now(); }
+      save(); renderAll(); toast('已删除');
+    },
+
+    calNav(d) {
+      calM += d;
+      if (calM < 1) { calM = 12; calY--; }
+      if (calM > 12) { calM = 1; calY++; }
+      renderPeriod();
+    },
+
+    saveNames() {
+      state.names = { a: $('nameA').value.trim(), b: $('nameB').value.trim() };
+      state.meta.updatedNames = Date.now();
+      save(); renderCoupleLine(); renderHome(); toast('已保存 👫');
+    },
+
+    genCode() {
+      $('syncOut').value = C.makeSyncCode(state);
+      toast('同步码已生成，复制后发给对方');
+    },
+
+    copyCode() {
+      const v = $('syncOut').value;
+      if (!v) { app.genCode(); return app.copyCode(); }
+      const done = () => toast('已复制，去微信粘贴发送吧');
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(v).then(done, () => fallbackCopy(v, done));
+      else fallbackCopy(v, done);
+    },
+
+    importCode() {
+      const raw = $('syncIn').value;
+      const remote = C.parseSyncCode(raw);
+      if (!remote) return toast('同步码不对，让对方重新生成试试');
+      const before = state.periods.filter(p => !p.deleted).length + state.anniversaries.filter(a => !a.deleted).length;
+      state = C.mergeState(state, remote);
+      save(); renderAll(); $('syncIn').value = '';
+      const after = state.periods.length + state.anniversaries.length;
+      toast(after > before ? '导入成功，新增了对方的数据 ✅' : '导入成功，数据已是最新 ✅');
+    },
+
+    exportData() {
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = '小日子备份-' + C.todayStr() + '.json';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+      toast('备份文件已下载，建议存到微信收藏');
+    },
+
+    importDataFile(input) {
+      const f = input.files && input.files[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = () => {
+        try {
+          const obj = JSON.parse(r.result);
+          if (!obj || typeof obj !== 'object' || !('periods' in obj)) throw 0;
+          if (!confirm('导入备份会与当前数据合并，确定继续？')) return;
+          state = C.mergeState(state, obj);
+          save(); renderAll(); toast('备份导入成功 ✅');
+        } catch (e) { toast('文件不对，请选择导出的备份 JSON'); }
+        input.value = '';
+      };
+      r.readAsText(f);
+    }
+  };
+
+  function fallbackCopy(text, done) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) { toast('复制失败，请长按文本框手动复制'); }
+    document.body.removeChild(ta);
+  }
+
+  window.app = app;
+  renderAll();
+
+  /* Service Worker:托管后可离线使用;本地 file:// 打开时静默跳过 */
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+})();
+</script>
+</body>
+</html>
