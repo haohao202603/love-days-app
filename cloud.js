@@ -223,6 +223,7 @@
 
       /* --- 照片处理 --- */
       if (store) {
+        const bg = merged.bgPhoto;
         /* 1. 上传本地新增的照片(还没有云端文件 id 的) */
         for (const d of (merged.diary || [])) {
           for (const ph of (d.photos || [])) {
@@ -237,6 +238,18 @@
               d.updatedAt = Date.now();
             } catch (e) { /* 单张失败不阻塞,下一轮重试 */ }
           }
+        }
+        /* 1b. 上传首页背景图 */
+        if (bg && bg.id && !bg.gistId) {
+          try {
+            const blob = await store.get(bg.id);
+            if (blob) {
+              const bytes = new Uint8Array(await blob.arrayBuffer());
+              if (bytes.length > 900 * 1024) throw new Error('图片过大');
+              const enc = await encryptBytes(bytes, cfg.pass);
+              bg.gistId = await photoGistCreate(cfg.token, JSON.stringify(enc));
+            }
+          } catch (e) { /* 失败下一轮重试 */ }
         }
         /* 2. 执行待删照片的云端清理 */
         const stillPending = [];
@@ -259,10 +272,21 @@
             } catch (e) { /* 单张失败不阻塞 */ }
           }
         }
+        /* 3b. 下载首页背景图 */
+        if (bg && bg.id && bg.gistId && !have.has(bg.id)) {
+          try {
+            const rawP = await photoGistGet(cfg.token, bg.gistId);
+            if (rawP) {
+              const dec = await decryptBytes(JSON.parse(rawP), cfg.pass);
+              if (dec.ok) await store.put(bg.id, new Blob([dec.bytes], { type: 'image/jpeg' }));
+            }
+          } catch (e) { /* 失败不阻塞 */ }
+        }
         /* 4. 清理本地不再被引用的照片 */
         try {
           const ref = new Set();
           for (const d of (merged.diary || [])) for (const ph of (d.photos || [])) ref.add(ph.id);
+          if (bg && bg.id) ref.add(bg.id);
           for (const k of await store.keys()) if (!ref.has(k)) await store.del(k);
         } catch (e) {}
       }
