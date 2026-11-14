@@ -88,6 +88,109 @@
     if (!res.ok) throw new Error('云端上传失败(HTTP ' + res.status + (res.status === 401 ? ',令牌可能填错或过期' : res.status === 403 ? ',权限不足或触发限流,稍后再试' : '') + ')');
   }
 
+  /* ---------- 照片独立云端文件(每张一个私密 gist,内容加密) ---------- */
+
+  async function photoGistCreate(token, encJson) {
+    const res = await fetch(API_BASE, {
+      method: 'POST',
+      headers: Object.assign({ 'Content-Type': 'application/json' }, gistHeaders(token)),
+      body: JSON.stringify({ description: 'img', public: false, files: { 'photo.jpg': { content: encJson } } })
+    });
+    if (!res.ok) throw new Error('照片上传失败(HTTP ' + res.status + ')');
+    const g = await res.json();
+    return g.id;
+  }
+
+  async function photoGistGet(token, gid) {
+    const res = await fetch(API_BASE + encodeURIComponent(gid), { headers: gistHeaders(token) });
+    if (!res.ok) throw new Error('照片拉取失败(HTTP ' + res.status + ')');
+    const g = await res.json();
+    const f = g.files && g.files['photo.jpg'];
+    return f ? (f.content || '') : '';
+  }
+
+  async function photoGistDelete(token, gid) {
+    try {
+      const res = await fetch(API_BASE + encodeURIComponent(gid), { method: 'DELETE', headers: gistHeaders(token) });
+      return res.ok || res.status === 404;
+    } catch (e) { return false; }
+  }
+
+  /* ---------- 二进制(照片)加密 ---------- */
+
+  async function encryptBytes(bytes, pass) {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await deriveKey(pass, salt);
+    const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, bytes);
+    return { v: 1, kind: 'bin', salt: b64encode(salt), iv: b64encode(new Uint8Array(iv)), data: b64encode(new Uint8Array(cipher)) };
+  }
+
+  async function decryptBytes(payload, pass) {
+    if (!payload || payload.kind !== 'bin' || !payload.salt || !payload.iv || !payload.data) return { ok: false, looksEnc: false };
+    try {
+      const key = await deriveKey(pass, b64decode(payload.salt));
+      let plain;
+      try {
+        plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64decode(payload.iv) }, key, b64decode(payload.data));
+      } catch (e) { return { ok: false, looksEnc: true }; }
+      return { ok: true, bytes: new Uint8Array(plain), looksEnc: true };
+    } catch (e) { return { ok: false, looksEnc: false }; }
+  }
+
+  /* ---------- 本地照片仓库(IndexedDB,浏览器专用) ---------- */
+
+  function makeIdbStore() {
+    let dbp = null;
+    function db() {
+      if (!dbp) dbp = new Promise(function (resolve, reject) {
+        const r = indexedDB.open('lovedays-media', 1);
+        r.onupgradeneeded = function () { r.result.createObjectStore('photos'); };
+        r.onsuccess = function () { resolve(r.result); };
+        r.onerror = function () { reject(r.error); };
+      });
+      return dbp;
+    }
+    return {
+      put: async function (k, blob) {
+        const d = await db();
+        return new Promise(function (res, rej) {
+          const t = d.transaction('photos', 'readwrite');
+          t.objectStore('photos').put(blob, k);
+          t.oncomplete = function () { res(true); };
+          t.onerror = function () { rej(t.error); };
+        });
+      },
+      get: async function (k) {
+        const d = await db();
+        return new Promise(function (res, rej) {
+          const rq = d.transaction('photos').objectStore('photos').get(k);
+          rq.onsuccess = function () { res(rq.result || null); };
+          rq.onerror = function () { rej(rq.error); };
+        });
+      },
+      del: async function (k) {
+        const d = await db();
+        return new Promise(function (res, rej) {
+          const t = d.transaction('photos', 'readwrite');
+          t.objectStore('photos').delete(k);
+          t.oncomplete = function () { res(true); };
+          t.onerror = function () { rej(t.error); };
+        });
+      },
+      keys: async function () {
+        const d = await db();
+        return new Promise(function (res, rej) {
+          const rq = d.transaction('photos').objectStore('photos').getAllKeys();
+          rq.onsuccess = function () { res(rq.result || []); };
+          rq.onerror = function () { rej(rq.error); };
+        });
+      }
+    };
+  }
+
+  const media = (typeof indexedDB !== 'undefined') ? makeIdbStore() : null;
+
   /* 取核心库:浏览器由 script 顺序保证;Node 环境回退到 require */
   function coreApi() {
     if (global.LoveCore) return global.LoveCore;
@@ -96,12 +199,14 @@
   }
 
   /*
-   * 完整同步:拉取 → 解密 → 与本地合并 → 推送合并结果
+   * 完整同步:拉取 → 解密 → 合并 → 照片上云/落库 → 清理 → 推送
    * 返回 { ok, state, error?, wrongPass? }
+   * store 可注入(测试用内存仓库);默认用 IndexedDB
    */
-  async function cloudSync(cfg, localState) {
+  async function cloudSync(cfg, localState, store) {
     try {
       const C = coreApi();
+      store = store || media;
       if (!cfg || !cfg.gistId || !cfg.token || !cfg.pass) return { ok: false, state: localState, error: '云端配置不完整' };
       const raw = await gistGet(cfg.gistId, cfg.token);
       let remote = null;
@@ -115,6 +220,53 @@
         if (d.ok) remote = d.state;
       }
       const merged = C.mergeState(localState, remote);
+
+      /* --- 照片处理 --- */
+      if (store) {
+        /* 1. 上传本地新增的照片(还没有云端文件 id 的) */
+        for (const d of (merged.diary || [])) {
+          for (const ph of (d.photos || [])) {
+            if (ph.gistId) continue;
+            try {
+              const blob = await store.get(ph.id);
+              if (!blob) continue; /* 本地也没有,等下一轮 */
+              const bytes = new Uint8Array(await blob.arrayBuffer());
+              if (bytes.length > 900 * 1024) throw new Error('照片过大');
+              const enc = await encryptBytes(bytes, cfg.pass);
+              ph.gistId = await photoGistCreate(cfg.token, JSON.stringify(enc));
+              d.updatedAt = Date.now();
+            } catch (e) { /* 单张失败不阻塞,下一轮重试 */ }
+          }
+        }
+        /* 2. 执行待删照片的云端清理 */
+        const stillPending = [];
+        for (const gid of (merged.pendingPhotoDeletes || [])) {
+          if (await photoGistDelete(cfg.token, gid)) continue;
+          stillPending.push(gid); /* 删失败(如断网)留到下轮 */
+        }
+        merged.pendingPhotoDeletes = stillPending;
+        /* 3. 下载本地缺少的照片 */
+        let have = new Set();
+        try { have = new Set(await store.keys()); } catch (e) {}
+        for (const d of (merged.diary || [])) {
+          for (const ph of (d.photos || [])) {
+            if (!ph.gistId || have.has(ph.id)) continue;
+            try {
+              const rawP = await photoGistGet(cfg.token, ph.gistId);
+              if (!rawP) continue;
+              const dec = await decryptBytes(JSON.parse(rawP), cfg.pass);
+              if (dec.ok) await store.put(ph.id, new Blob([dec.bytes], { type: 'image/jpeg' }));
+            } catch (e) { /* 单张失败不阻塞 */ }
+          }
+        }
+        /* 4. 清理本地不再被引用的照片 */
+        try {
+          const ref = new Set();
+          for (const d of (merged.diary || [])) for (const ph of (d.photos || [])) ref.add(ph.id);
+          for (const k of await store.keys()) if (!ref.has(k)) await store.del(k);
+        } catch (e) {}
+      }
+
       await gistPut(cfg.gistId, cfg.token, await encryptState(merged, cfg.pass));
       return { ok: true, state: merged };
     } catch (e) {
@@ -122,7 +274,9 @@
     }
   }
 
-  const api = { setDefaultGist, getDefaultGist, encryptState, decryptState, gistGet, gistPut, cloudSync, FILE_NAME };
+  const api = { setDefaultGist, getDefaultGist, encryptState, decryptState, encryptBytes, decryptBytes,
+    gistGet, gistPut, photoGistCreate, photoGistGet, photoGistDelete,
+    cloudSync, media: media, FILE_NAME };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else global.LoveCloud = api;
 })(typeof window !== 'undefined' ? window : globalThis);
