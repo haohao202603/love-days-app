@@ -456,9 +456,10 @@
     <div class="card">
       <h3>💗 关于</h3>
       <div class="muted" style="line-height:1.8">
-        我们的小日子 · 情侣纪念日 & 经期小助手<br>
-        纯本地网页应用：零广告、零收费、零服务器，不会停运。<br>
-        只要不清除浏览器数据、记得定期备份，就能一直用下去。
+        我们的小日子 <b id="appVer">v4.0</b> · 情侣纪念日 & 经期小助手<br>
+        纯本地网页应用:零广告、零收费、零服务器,不会停运。<br>
+        更新方式:打开 App 等两秒自动换新,无需手动刷新或重装。<br>
+        只要不清除浏览器数据、记得定期备份,就能一直用下去。
       </div>
     </div>
   </section>
@@ -1190,9 +1191,16 @@
   renderCloud();
   if (cloudCfg && cloudCfg.token && cloudCfg.pass) doCloudSync(true);  /* 打开即自动同步 */
 
-  /* Service Worker:托管后可离线使用;本地 file:// 打开时静默跳过 */
+  /* Service Worker:托管后可离线使用;新版本自动加载,无需手动刷新 */
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+    let swRefreshed = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      /* 新版本接管时自动刷新一次,让界面立即换新 */
+      if (swRefreshed) return;
+      swRefreshed = true;
+      location.reload();
+    });
   }
 })();
 </script>
