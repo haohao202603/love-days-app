@@ -343,6 +343,20 @@
     </div>
 
     <div class="card">
+      <h3>☁️ 云端自动同步（推荐）
+        <span style="flex:1"></span>
+        <span id="cloudStatus" style="font-weight:500;font-size:12px;color:var(--muted)">未配置</span>
+      </h3>
+      <div class="tip-box" style="margin-bottom:12px">配置一次后，打开 App 会自动合并对方的新记录，记录完自动上传，不用再互发同步码。数据加密后存放在你们的私密云端文件里，任何人（包括 GitHub）都看不到内容。</div>
+      <div class="field"><label>访问令牌 Token</label><input type="password" id="cloudToken" placeholder="粘贴 gho_ 开头的令牌" autocomplete="off"></div>
+      <div class="field"><label>加密暗号（两台手机必须填一样的）</label><input type="password" id="cloudPass" placeholder="只有你们俩知道的一句话" autocomplete="off"></div>
+      <div class="row">
+        <button class="btn small" onclick="app.cloudSave()">保存并立即同步</button>
+        <button class="btn small ghost" onclick="app.cloudClear()">断开云端</button>
+      </div>
+    </div>
+
+    <div class="card">
       <h3>💾 数据备份（重要）</h3>
       <div class="muted" style="margin-bottom:12px">数据存在手机浏览器里，强烈建议每月导出一次备份文件，存到微信收藏，换手机也不怕丢。</div>
       <div class="row">
@@ -383,6 +397,7 @@
 <div id="toast"></div>
 
 <script src="core.js"></script>
+<script src="cloud.js"></script>
 <script>
 (function () {
   'use strict';
@@ -398,7 +413,7 @@
     } catch (e) {}
     return C.emptyState();
   }
-  function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
+  function save() { localStorage.setItem(KEY, JSON.stringify(state)); scheduleCloudSync(); }
 
   let state = load();
   let calY = C.todayStr().slice(0, 4) | 0;
@@ -577,7 +592,54 @@
       : '<span class="placeholder">去「同步」页写下你们俩的名字吧</span>';
   }
 
-  function renderAll() { renderHome(); renderAnn(); renderPeriod(); renderSync(); }
+  /* ---------- 云端自动同步 ---------- */
+  const CLOUD_KEY = 'lovedays.cloud.v1';
+  let cloudCfg = (function () { try { return JSON.parse(localStorage.getItem(CLOUD_KEY)) || null; } catch (e) { return null; } })();
+  let syncing = false, pendingSync = false, syncTimer = null;
+
+  function setCloudStatus(txt) { const el = $('cloudStatus'); if (el) el.textContent = txt; }
+
+  function renderCloud() {
+    $('cloudToken').value = (cloudCfg && cloudCfg.token) || '';
+    $('cloudPass').value = (cloudCfg && cloudCfg.pass) || '';
+    if (!cloudCfg || !cloudCfg.token || !cloudCfg.pass) return setCloudStatus('未配置');
+    setCloudStatus(cloudCfg.lastOk ? '✅ ' + cloudCfg.lastOk : '⚠️ 待同步');
+  }
+
+  async function doCloudSync(silent) {
+    if (!cloudCfg || !cloudCfg.token || !cloudCfg.pass) return;
+    if (syncing) { pendingSync = true; return; }
+    syncing = true;
+    setCloudStatus('⟳ 同步中…');
+    const r = await window.LoveCloud.cloudSync(
+      { gistId: window.LoveCloud.getDefaultGist(), token: cloudCfg.token, pass: cloudCfg.pass }, state);
+    if (r.ok) {
+      const t = new Date();
+      const hh = String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0');
+      cloudCfg.lastOk = hh + ' 已同步';
+      localStorage.setItem(CLOUD_KEY, JSON.stringify(cloudCfg));
+      if (JSON.stringify(r.state) !== JSON.stringify(state)) {
+        state = r.state;  /* 云端带来了对方的新数据 */
+        localStorage.setItem(KEY, JSON.stringify(state));
+        renderAll();
+      }
+      setCloudStatus('✅ ' + cloudCfg.lastOk);
+      if (!silent) toast('云端同步完成 ✅');
+    } else {
+      setCloudStatus('⚠️ ' + (r.error || '同步失败'));
+      if (!silent) toast(r.error || '同步失败');
+    }
+    syncing = false;
+    if (pendingSync) { pendingSync = false; setTimeout(function () { doCloudSync(true); }, 3000); }
+  }
+
+  function scheduleCloudSync() {
+    if (!cloudCfg || !cloudCfg.token || !cloudCfg.pass) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(function () { doCloudSync(true); }, 4000);
+  }
+
+  function renderAll() { renderHome(); renderAnn(); renderPeriod(); renderSync(); renderCloud(); }
 
   /* ---------- 对外动作 ---------- */
 
@@ -719,6 +781,26 @@
         input.value = '';
       };
       r.readAsText(f);
+    },
+
+    cloudSave() {
+      const token = $('cloudToken').value.trim();
+      const pass = $('cloudPass').value;
+      if (!token) return toast('先粘贴访问令牌 Token');
+      if (!/^(gho_|ghp_|github_pat_)/.test(token)) return toast('Token 格式不对，应以 gho_ 或 ghp_ 开头');
+      if (!pass) return toast('想一句只有你们俩知道的暗号');
+      cloudCfg = Object.assign({}, cloudCfg || {}, { token: token, pass: pass, lastOk: cloudCfg && cloudCfg.lastOk });
+      localStorage.setItem(CLOUD_KEY, JSON.stringify(cloudCfg));
+      renderCloud();
+      doCloudSync(false);
+    },
+
+    cloudClear() {
+      if (!confirm('断开云端自动同步？\n（手机里已存的数据不受影响，手动同步码照常可用）')) return;
+      localStorage.removeItem(CLOUD_KEY);
+      cloudCfg = null;
+      renderCloud();
+      toast('已断开云端同步');
     }
   };
 
@@ -733,7 +815,10 @@
   }
 
   window.app = app;
+  window.LoveCloud.setDefaultGist('a69c7971bcbc44680f8d277dcec080ab');
   renderAll();
+  renderCloud();
+  if (cloudCfg && cloudCfg.token && cloudCfg.pass) doCloudSync(true);  /* 打开即自动同步 */
 
   /* Service Worker:托管后可离线使用;本地 file:// 打开时静默跳过 */
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
