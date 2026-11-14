@@ -1,5 +1,5 @@
 /* 我们的小日子 - 离线缓存:所有文件都在第一次打开时缓存,之后断网也能用 */
-const CACHE = 'lovedays-v3';
+const CACHE = 'lovedays-v4';
 const ASSETS = ['./', './index.html', './core.js', './cloud.js', './manifest.json',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-512-maskable.png', './icons/apple-touch-icon.png'];
 
