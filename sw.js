@@ -1,6 +1,6 @@
 /* 我们的小日子 - 离线缓存:所有文件都在第一次打开时缓存,之后断网也能用 */
-const CACHE = 'lovedays-v1';
-const ASSETS = ['./', './index.html', './core.js', './manifest.json',
+const CACHE = 'lovedays-v2';
+const ASSETS = ['./', './index.html', './core.js', './cloud.js', './manifest.json',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-512-maskable.png', './icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
