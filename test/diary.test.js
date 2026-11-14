@@ -103,6 +103,40 @@ function memStore() {
   ok(r3.ok && deletedIds.includes(entry.photos[0].gistId), '删除日记后,云端照片文件被清理');
   ok(r3.state.diary.length === 0 && r3.state.pendingPhotoDeletes.length === 0, '删除元数据同步完成,待删列表清空');
 
+  console.log('— 首页背景图 —');
+  /* 合并:A 设置了背景,B 没有 */
+  const LB = C.emptyState();
+  LB.bgPhoto = { id: 'b1', gistId: 'gb1', updatedAt: 500 };
+  const MB = C.mergeState(LB, C.emptyState());
+  ok(MB.bgPhoto && MB.bgPhoto.id === 'b1', '背景图对象正常合并');
+  /* 墓碑:恢复默认(空 id)的时间戳更新 → 覆盖旧背景 */
+  const LB2 = C.emptyState();
+  LB2.bgPhoto = { id: '', gistId: null, updatedAt: 900 };
+  const MB2 = C.mergeState(LB2, LB);
+  ok(MB2.bgPhoto.id === '', '恢复默认的墓碑覆盖旧背景');
+
+  /* 云端流程:A 上传背景 → B 下载;A 恢复默认 → 云端清理 */
+  const bgBytes = new Uint8Array(512);
+  for (let i = 0; i < bgBytes.length; i++) bgBytes[i] = (i * 3) % 256;
+  const stBg = C.emptyState();
+  stBg.names = { a: '甲', b: '乙' }; stBg.meta.updatedNames = 10;
+  stBg.bgPhoto = { id: 'bg1', gistId: null, updatedAt: 1 };
+  const storeBgA = memStore();
+  await storeBgA.put('bg1', new Blob([bgBytes], { type: 'image/jpeg' }));
+  const rb1 = await CL.cloudSync({ gistId: 'main', token: 't', pass: 'p' }, stBg, storeBgA);
+  ok(rb1.ok && rb1.state.bgPhoto.gistId && String(rb1.state.bgPhoto.gistId).indexOf('g') === 0, '背景图已上传云端');
+  const storeBgB = memStore();
+  const rb2 = await CL.cloudSync({ gistId: 'main', token: 't', pass: 'p' }, C.emptyState(), storeBgB);
+  ok(rb2.ok && storeBgB._m.has('bg1'), 'B 机自动下载背景图');
+  const bgGot = new Uint8Array(await (await storeBgB.get('bg1')).arrayBuffer());
+  ok(bgGot.length === 512 && bgGot[9] === (9 * 3) % 256, '背景图字节一致');
+  /* 恢复默认:云端照片文件被清理 */
+  const stBg2 = C.emptyState();
+  stBg2.bgPhoto = { id: '', gistId: null, updatedAt: Date.now() };
+  stBg2.pendingPhotoDeletes.push(rb1.state.bgPhoto.gistId);
+  const rb3 = await CL.cloudSync({ gistId: 'main', token: 't', pass: 'p' }, stBg2, storeBgA);
+  ok(rb3.ok && deletedIds.includes(rb1.state.bgPhoto.gistId), '恢复默认后云端背景文件被清理');
+
   console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
   process.exit(fail ? 1 : 0);
 })().catch(e => { console.error('测试异常:', e); process.exit(1); });
