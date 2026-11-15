@@ -484,7 +484,7 @@
     <div class="card">
       <h3>💗 关于</h3>
       <div class="muted" style="line-height:1.8">
-        我们的小日子 <b id="appVer">v4.3</b> · 情侣纪念日 & 经期小助手<br>
+        我们的小日子 <b id="appVer">v4.4</b> · 情侣纪念日 & 经期小助手<br>
         <div>本机数据:日记 <b id="statDiary">0</b> 篇 · 经期 <b id="statPer">0</b> 条 · 照片 <b id="statPhoto">0</b> 张</div>
         <div>入口:<span id="appOrigin"></span>(两个图标若不同,说明装了两次)</div><br>
         纯本地网页应用:零广告、零收费、零服务器,不会停运。<br>
@@ -832,8 +832,8 @@
         localStorage.setItem(KEY, JSON.stringify(state));
         renderAll();
       }
-      setCloudStatus('✅ ' + cloudCfg.lastOk);
-      if (!silent) toast('云端同步完成 ✅');
+      setCloudStatus('✅ ' + cloudCfg.lastOk + (r.photoFails ? ' · ' + r.photoFails + ' 张照片待重传' : ''));
+      if (!silent) toast(r.photoFails ? ('同步完成,但 ' + r.photoFails + ' 张照片暂未传上,稍后自动重试') : '云端同步完成 ✅');
     } else {
       setCloudStatus('⚠️ ' + (r.error || '同步失败'));
       if (!silent) toast(r.error || '同步失败');
