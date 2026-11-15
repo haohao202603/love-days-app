@@ -58,10 +58,15 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  ✓ ' + msg); } else
   const r3 = await CL.cloudSync({ gistId: 'x', token: 't', pass: '另一个暗号' }, state);
   ok(!r3.ok && r3.wrongPass === true && /暗号/.test(r3.error), '暗号不一致:明确提示且不覆盖');
 
-  /* 场景4:网络失败 → 报错不丢本地 */
+  /* 场景4:断网 → 报错不丢本地 */
   global.fetch = async () => { throw new TypeError('Failed to fetch'); };
   const r4 = await CL.cloudSync({ gistId: 'x', token: 't', pass: 'p1' }, state);
   ok(!r4.ok && JSON.stringify(r4.state) === JSON.stringify(state), '断网:报错且本地数据不动');
+
+  /* 场景5:云端文件过大被截断 → 中止同步,绝不覆盖 */
+  global.fetch = async () => ({ ok: true, json: async () => ({ files: { 'sync.json': { truncated: true, content: '' } } }) });
+  const r5 = await CL.cloudSync({ gistId: 'x', token: 't', pass: 'p1' }, state);
+  ok(!r5.ok && /截断/.test(r5.error), '截断保护:中止且明确报错');
 
   console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
   process.exit(fail ? 1 : 0);
