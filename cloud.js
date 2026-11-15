@@ -76,6 +76,7 @@
     if (!res.ok) throw new Error('云端拉取失败(HTTP ' + res.status + (res.status === 401 ? ',令牌可能填错' : res.status === 404 ? ',云端文件ID可能填错' : '') + ')');
     const g = await res.json();
     const f = g.files && g.files[FILE_NAME];
+    if (f && f.truncated) throw new Error('云端数据过大被截断,为防覆盖已中止同步');
     return f ? (f.content || '') : '';
   }
 
