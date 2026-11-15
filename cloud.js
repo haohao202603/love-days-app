@@ -92,7 +92,8 @@
   /* ---------- 照片独立云端文件(每张一个私密 gist,内容加密) ---------- */
 
   async function photoGistCreate(token, encJson) {
-    const res = await fetch(API_BASE, {
+    /* 注意:创建接口不能带尾斜杠(/gists/ 会 404),必须是 /gists */
+    const res = await fetch(API_BASE.replace(/\/+$/, ''), {
       method: 'POST',
       headers: Object.assign({ 'Content-Type': 'application/json' }, gistHeaders(token)),
       body: JSON.stringify({ description: 'img', public: false, files: { 'photo.jpg': { content: encJson } } })
@@ -223,6 +224,7 @@
       const merged = C.mergeState(localState, remote);
 
       /* --- 照片处理 --- */
+      let photoFails = 0;
       if (store) {
         const bg = merged.bgPhoto;
         /* 1. 上传本地新增的照片(还没有云端文件 id 的) */
@@ -237,7 +239,7 @@
               const enc = await encryptBytes(bytes, cfg.pass);
               ph.gistId = await photoGistCreate(cfg.token, JSON.stringify(enc));
               d.updatedAt = Date.now();
-            } catch (e) { /* 单张失败不阻塞,下一轮重试 */ }
+            } catch (e) { photoFails++; /* 单张失败不阻塞,下一轮重试 */ }
           }
         }
         /* 1b. 上传首页背景图 */
@@ -250,7 +252,7 @@
               const enc = await encryptBytes(bytes, cfg.pass);
               bg.gistId = await photoGistCreate(cfg.token, JSON.stringify(enc));
             }
-          } catch (e) { /* 失败下一轮重试 */ }
+          } catch (e) { photoFails++; /* 失败下一轮重试 */ }
         }
         /* 2. 执行待删照片的云端清理 */
         const stillPending = [];
@@ -293,7 +295,7 @@
       }
 
       await gistPut(cfg.gistId, cfg.token, await encryptState(merged, cfg.pass));
-      return { ok: true, state: merged };
+      return { ok: true, state: merged, photoFails: photoFails };
     } catch (e) {
       return { ok: false, state: localState, error: (e && e.message) ? e.message : '网络异常,稍后自动重试' };
     }
