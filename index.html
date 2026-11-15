@@ -444,8 +444,9 @@
       <div class="field"><label>访问令牌 Token</label><input type="password" id="cloudToken" placeholder="粘贴 gho_ 开头的令牌" autocomplete="off"></div>
       <div class="field"><label>加密暗号（两台手机必须填一样的）</label><input type="password" id="cloudPass" placeholder="只有你们俩知道的一句话" autocomplete="off"></div>
       <div class="row">
-        <button class="btn small" onclick="app.cloudSave()">保存并立即同步</button>
-        <button class="btn small ghost" onclick="app.cloudClear()">断开云端</button>
+        <button class="btn small" onclick="app.cloudSave()">保存配置并同步</button>
+        <button class="btn small ghost" onclick="app.cloudNow()">立即同步</button>
+        <button class="btn small ghost" onclick="app.cloudClear()">断开</button>
       </div>
     </div>
 
@@ -483,7 +484,7 @@
     <div class="card">
       <h3>💗 关于</h3>
       <div class="muted" style="line-height:1.8">
-        我们的小日子 <b id="appVer">v4.1</b> · 情侣纪念日 & 经期小助手<br>
+        我们的小日子 <b id="appVer">v4.2</b> · 情侣纪念日 & 经期小助手<br>
         纯本地网页应用:零广告、零收费、零服务器,不会停运。<br>
         更新方式:打开 App 等两秒自动换新,无需手动刷新或重装。<br>
         只要不清除浏览器数据、记得定期备份,就能一直用下去。
@@ -1096,6 +1097,11 @@
       toast('已断开云端同步');
     },
 
+    cloudNow() {
+      if (!cloudCfg || !cloudCfg.token || !cloudCfg.pass) return toast('先填好 Token 和暗号');
+      doCloudSync(false);
+    },
+
     setIdentity(w) {
       identity = w;
       localStorage.setItem(IDENTITY_KEY, w);
@@ -1270,7 +1276,10 @@
   window.LoveCloud.setDefaultGist('a69c7971bcbc44680f8d277dcec080ab');
   renderAll();
   renderCloud();
-  if (cloudCfg && cloudCfg.token && cloudCfg.pass) doCloudSync(true);  /* 打开即自动同步 */
+  if (cloudCfg && cloudCfg.token && cloudCfg.pass) {
+    doCloudSync(true);  /* 打开即自动同步 */
+    setInterval(function () { doCloudSync(true); }, 60000);  /* 打开期间每分钟自动拉取对方新内容 */
+  }
 
   /* Service Worker:托管后可离线使用;新版本自动加载,无需手动刷新 */
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
