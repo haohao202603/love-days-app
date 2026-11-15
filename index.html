@@ -484,7 +484,9 @@
     <div class="card">
       <h3>💗 关于</h3>
       <div class="muted" style="line-height:1.8">
-        我们的小日子 <b id="appVer">v4.2</b> · 情侣纪念日 & 经期小助手<br>
+        我们的小日子 <b id="appVer">v4.3</b> · 情侣纪念日 & 经期小助手<br>
+        <div>本机数据:日记 <b id="statDiary">0</b> 篇 · 经期 <b id="statPer">0</b> 条 · 照片 <b id="statPhoto">0</b> 张</div>
+        <div>入口:<span id="appOrigin"></span>(两个图标若不同,说明装了两次)</div><br>
         纯本地网页应用:零广告、零收费、零服务器,不会停运。<br>
         更新方式:打开 App 等两秒自动换新,无需手动刷新或重装。<br>
         只要不清除浏览器数据、记得定期备份,就能一直用下去。
@@ -765,6 +767,11 @@
     $('idB').textContent = state.names.b || '称呼B';
     $('idA').classList.toggle('on', identity === 'a');
     $('idB').classList.toggle('on', identity === 'b');
+    /* 关于卡:本机数据统计 + 入口识别(用于排查重复安装) */
+    $('statDiary').textContent = (state.diary || []).filter(function (d) { return !d.deleted; }).length;
+    $('statPer').textContent = (state.periods || []).length;
+    $('statPhoto').textContent = (state.diary || []).reduce(function (n, d) { return n + (d.photos || []).length; }, 0);
+    $('appOrigin').textContent = location.host;
     /* 背景图预览 */
     (async function () {
       const pv = $('bgPreview');
